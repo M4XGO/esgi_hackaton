@@ -1,5 +1,7 @@
 SHELL := /bin/bash
-.PHONY: all namespaces secrets multus-install multus ldap app monitoring backup velero netpol restore test-netpol scope ingresses hosts
+DOCKER_HUB_USER ?= m4xgo
+
+.PHONY: all namespaces secrets multus-install multus ldap app monitoring backup velero netpol restore test-netpol scope ingresses hosts build push build-push
 
 all: namespaces secrets multus ldap monitoring backup
 
@@ -20,11 +22,24 @@ multus:
 ldap:
 	kubectl apply -f k8s/ldap/
 	kubectl rollout status statefulset/openldap -n services --timeout=120s
+	kubectl rollout status deployment/phpldapadmin -n services --timeout=120s
 
-# app:
-# 	kubectl apply -f k8s/itadaki/
-# 	kubectl rollout status deployment/itadaki-backend -n services --timeout=120s
-# 	kubectl rollout status deployment/itadaki-frontend -n services --timeout=120s
+app:
+	kubectl apply -f k8s/itadaki/
+	kubectl rollout status deployment/itadaki-backend -n services --timeout=180s
+	kubectl rollout status deployment/itadaki-frontend -n services --timeout=120s
+
+# ── Docker build & push vers Docker Hub ──────────────────────────────────────
+# Prérequis : docker login
+build:
+	docker build --platform linux/amd64 -t $(DOCKER_HUB_USER)/itadaki-backend:latest ../itadaki/backend
+	docker build --platform linux/amd64 -t $(DOCKER_HUB_USER)/itadaki-frontend:latest ../itadaki/frontend
+
+push:
+	docker push $(DOCKER_HUB_USER)/itadaki-backend:latest
+	docker push $(DOCKER_HUB_USER)/itadaki-frontend:latest
+
+build-push: build push
 
 monitoring:
 	helm repo add grafana https://grafana.github.io/helm-charts || true
@@ -45,9 +60,9 @@ backup:
 netpol:
 	kubectl apply -f k8s/networkpolicies/
 
-
 restore:
-	kubectl create job restore-now --from=cronjob/h2-backup -n services
+	kubectl delete job h2-restore -n services --ignore-not-found
+	kubectl apply -f k8s/backup/restore-job.yaml
 
 test-netpol:
 	bash scripts/test-netpol.sh
@@ -58,7 +73,7 @@ scope:
 	kubectl rollout status deployment/weave-scope-app -n weave --timeout=120s
 	kubectl apply -f k8s/ingresses/scope-ingress.yaml
 
-# ── Ingress pour les UIs (Grafana, Prometheus, Alertmanager, ArgoCD, Scope) ───
+# ── Ingress pour les UIs (Grafana, Prometheus, Alertmanager, Scope) ───
 ingresses:
 	kubectl apply -f k8s/ingresses/
 
@@ -66,7 +81,7 @@ ingresses:
 hosts:
 	@NODE_IP=$$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}') && \
 	sudo sed -i '' '/acme\.test/d' /etc/hosts && \
-	echo "$$NODE_IP  itadaki.acme.test grafana.acme.test prometheus.acme.test alertmanager.acme.test argocd.acme.test scope.acme.test" | sudo tee -a /etc/hosts && \
+	echo "$$NODE_IP  itadaki.acme.test grafana.acme.test prometheus.acme.test alertmanager.acme.test scope.acme.test phpldapadmin.acme.test" | sudo tee -a /etc/hosts && \
 	echo "✓ /etc/hosts mis à jour → $$NODE_IP"
 
 # ── Velero + Minio ────────────────────────────────────────────────────────────

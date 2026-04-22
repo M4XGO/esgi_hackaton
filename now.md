@@ -13,7 +13,7 @@ Le cluster K3s a déjà installé via Terraform :
 - **kube-prometheus-stack** (Prometheus + Grafana + Alertmanager + node-exporter)
   - Prometheus : PVC `local-path`, rétention configurée
   - Grafana : sidecar activé pour auto-découverte des datasources (label `grafana_datasource: "1"`)
-- **cert-manager**, **ingress-nginx**, **Cilium** (CNI), **ArgoCD**, **argo-rollouts**
+- **cert-manager**, **ingress-nginx**, **Cilium** (CNI)
 
 Ce repo **ne touche pas** à cette infra — il déploie par-dessus.
 

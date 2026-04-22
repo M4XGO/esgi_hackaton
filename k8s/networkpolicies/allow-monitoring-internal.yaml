@@ -1,0 +1,31 @@
+# Autorise la communication intra-namespace monitoring
+# Nécessaire pour : Grafana → Prometheus, Promtail → Loki, Grafana → Loki, etc.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-internal
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    # Communication intra-namespace
+    - to:
+        - podSelector: {}
+    # Accès à l'API Kubernetes (sidecar Grafana pour charger datasources/dashboards)
+    # ClusterIP du service kubernetes + IP réelle de l'API server (post-DNAT)
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+        - ipBlock:
+            cidr: 10.230.105.254/32
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443

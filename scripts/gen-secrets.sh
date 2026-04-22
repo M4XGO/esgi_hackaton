@@ -39,4 +39,9 @@ aws_access_key_id=${MINIO_ROOT_USER}
 aws_secret_access_key=${MINIO_ROOT_PASSWORD}" \
   -n velero --dry-run=client -o yaml | kubectl apply -f -
 
+# JWT secret pour le backend Itadaki
+kubectl create secret generic itadaki-secret \
+  --from-literal=JWT_SECRET="$JWT_SECRET" \
+  -n services --dry-run=client -o yaml | kubectl apply -f -
+
 echo "Secrets + ConfigMaps created/updated."

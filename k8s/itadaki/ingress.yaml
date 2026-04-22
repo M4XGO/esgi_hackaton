@@ -6,7 +6,7 @@ metadata:
   annotations:
     # Pour réseau local sans accès internet : utiliser selfsigned-issuer
     # cert-manager.io/cluster-issuer: selfsigned-issuer
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: ca-issuer
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
 spec:
@@ -27,7 +27,7 @@ spec:
                 name: itadaki-backend
                 port:
                   number: 8080
-          # /* → frontend Next.js
+          # /* → frontend React Router
           - path: /
             pathType: Prefix
             backend:

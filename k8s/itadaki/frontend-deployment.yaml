@@ -19,17 +19,12 @@ spec:
     spec:
       containers:
         - name: frontend
-          # Image buildée localement et poussée dans le registry K3s
-          # Pousser avec : docker tag itadaki-frontend:latest localhost:5000/itadaki-frontend:latest
-          #                docker push localhost:5000/itadaki-frontend:latest
-          image: localhost:5000/itadaki-frontend:latest
+          image: m4xgo/itadaki-frontend:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
               name: http
           env:
-            - name: NEXT_PUBLIC_API_URL
-              value: http://itadaki-backend.services.svc.cluster.local:8080
             - name: NODE_ENV
               value: production
           readinessProbe:

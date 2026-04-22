@@ -19,17 +19,14 @@ spec:
     spec:
       containers:
         - name: backend
-          # Image buildée localement et poussée dans le registry K3s
-          # Pousser avec : docker tag itadaki-backend:latest localhost:5000/itadaki-backend:latest
-          #                docker push localhost:5000/itadaki-backend:latest
-          image: localhost:5000/itadaki-backend:latest
+          image: m4xgo/itadaki-backend:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
               name: http
           env:
             - name: SPRING_DATASOURCE_URL
-              value: jdbc:h2:file:/data/itadaki;AUTO_SERVER=TRUE
+              value: jdbc:h2:file:/data/itadaki
             - name: SPRING_DATASOURCE_DRIVER_CLASS_NAME
               value: org.h2.Driver
             - name: SPRING_JPA_DATABASE_PLATFORM
@@ -38,20 +35,18 @@ spec:
               value: "true"
             - name: SPRING_H2_CONSOLE_SETTINGS_WEB_ALLOW_OTHERS
               value: "true"
-            - name: LDAP_URL
-              value: ldap://openldap.services.svc.cluster.local:389
-            - name: LDAP_BASE_DN
-              value: dc=acme,dc=local
-            - name: LDAP_BIND_DN
-              value: cn=admin,dc=acme,dc=local
-            - name: LDAP_BIND_PASSWORD
+            - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: ldap-secret
-                  key: LDAP_BIND_PASSWORD
+                  name: itadaki-secret
+                  key: JWT_SECRET
+            - name: UPLOAD_DIRECTORY
+              value: /uploads
+            # Ollama désactivé — FoodAnalyzer retourne un stub si indisponible
+            - name: SPRING_AI_OLLAMA_BASE_URL
+              value: http://ollama-disabled:11434
           readinessProbe:
-            httpGet:
-              path: /actuator/health
+            tcpSocket:
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 10
@@ -59,22 +54,27 @@ spec:
             failureThreshold: 6
           livenessProbe:
             httpGet:
-              path: /actuator/health
+              path: /v3/api-docs
               port: 8080
             initialDelaySeconds: 60
             periodSeconds: 15
             timeoutSeconds: 5
           resources:
             requests:
-              memory: 256Mi
-              cpu: 100m
-            limits:
               memory: 512Mi
-              cpu: 500m
+              cpu: 250m
+            limits:
+              memory: 1Gi
+              cpu: 1000m
           volumeMounts:
             - name: h2-data
               mountPath: /data
+            - name: uploads
+              mountPath: /uploads
       volumes:
         - name: h2-data
           persistentVolumeClaim:
             claimName: itadaki-h2-pvc
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: itadaki-uploads-pvc

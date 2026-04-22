@@ -1,0 +1,63 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-phpldapadmin
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: phpldapadmin
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-phpldapadmin-to-ldap-egress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: phpldapadmin
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: openldap
+      ports:
+        - protocol: TCP
+          port: 389
+    # DNS
+    - ports:
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-phpldapadmin-to-ldap-ingress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: openldap
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: phpldapadmin
+      ports:
+        - protocol: TCP
+          port: 389

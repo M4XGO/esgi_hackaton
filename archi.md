@@ -5,74 +5,76 @@
 | Couche | Technologie | Namespace |
 |--------|-------------|-----------|
 | CNI | Flannel (K3s défaut) | cluster-wide |
-| Réseau secondaire | Multus (macvlan sur eth0) | cluster-wide |
-| Visualisation réseau | Weave Scope :4040 | weave |
-| Ingress controller | ingress-nginx (NodePort → LoadBalancer) | ingress-nginx |
-| TLS | cert-manager + ca-issuer (self-signed CA) | cluster-wide |
-| Frontend | Next.js :3000 | services |
-| Backend | Java Spring Boot :8080 | services |
-| Base de données | H2 (fichier persistant sur PVC) | services |
+| Réseau secondaire | Multus (macvlan) | cluster-wide |
+| Visualisation réseau | Weave Scope :4040 (app + agent + cluster-agent) | weave |
+| Ingress controller | ingress-nginx (LoadBalancer via K3s ServiceLB) | ingress-nginx |
+| TLS | cert-manager + ca-issuer (self-signed CA) | cert-manager |
+| Frontend | React Router 7 (SSR, Bun) :3000 | services |
+| Backend | Java Spring Boot 4 + H2 :8080 | services |
+| Base de données | H2 fichier persistant sur PVC (2Gi) | services |
+| Uploads | PVC 5Gi (images food) | services |
 | Annuaire | OpenLDAP :389 (StatefulSet) | services |
 | Logs | Loki + Promtail | monitoring |
 | Métriques | Prometheus + Grafana + Alertmanager | monitoring |
-| GitOps | ArgoCD | argocd |
-| Backup K8s | Velero + Minio S3 | velero |
+| Backup K8s | Velero + Kopia + Minio S3 (20Gi) | velero |
 
 ## URLs exposées via Ingress
 
-| Service | URL | Port backend |
-|---------|-----|-------------|
+| Service | URL | Port pod |
+|---------|-----|---------|
 | Itadaki (app) | `https://itadaki.acme.test` | frontend:3000 / backend:8080 |
-| Grafana | `https://grafana.acme.test` | :3000 |
+| Grafana | `https://grafana.acme.test` | :3000 (svc :80) |
 | Prometheus | `https://prometheus.acme.test` | :9090 |
 | Alertmanager | `https://alertmanager.acme.test` | :9093 |
-| ArgoCD | `https://argocd.acme.test` | :8080 |
 | Weave Scope | `https://scope.acme.test` | :4040 |
 
-> DNS : entrée wildcard dans `/etc/hosts` → IP du nœud K3s (`make hosts`)
-> Ingress-nginx : NodePort 30376 (HTTPS) / 31300 (HTTP), exposé via K3s ServiceLB
+> DNS : entrées dans `/etc/hosts` → `10.230.105.254` (`make hosts`)
+> Ingress-nginx : LoadBalancer `10.230.105.254:443` (NodePort 30376) / `:80` (NodePort 31300)
 
 ## Schéma d'architecture général
 
 ```mermaid
 graph TD
-    subgraph client["💻 Client (Mac)"]
-        USER([Utilisateur\n*.acme.test])
+    subgraph client["Client (Mac)"]
+        USER(["Utilisateur *.acme.test"])
     end
 
     subgraph ingress_ns["namespace: ingress-nginx"]
-        INGRESS["ingress-nginx\nNodePort :30376 HTTPS\nNodePort :31300 HTTP\nServiceLB → :443/:80"]
+        INGRESS["ingress-nginx - LoadBalancer 10.230.105.254 - :443 (NodePort 30376) - :80 (NodePort 31300)"]
     end
 
-    subgraph services["namespace: services"]
-        FRONT["itadaki-frontend\nNext.js :3000"]
-        BACK["itadaki-backend\nJava :8080"]
-        LDAP["openldap\n:389"]
-        H2[("PVC itadaki-h2\n2Gi")]
-        LDAP_D[("PVC ldap-data\n1Gi")]
-        BK_PVC[("PVC backup\n10Gi")]
-        CRON["CronJob h2-backup\n@ 2h"]
+    subgraph services["namespace: services  [zone=services]"]
+        FRONT["itadaki-frontend - React Router 7 - :3000"]
+        BACK["itadaki-backend - Spring Boot 4 - :8080"]
+        LDAP["openldap - :389"]
+        H2[("PVC itadaki-h2 - 2Gi")]
+        UP[("PVC uploads - 5Gi")]
+        LC[("PVC ldap-config - 100Mi")]
+        LD[("PVC ldap-data - 1Gi")]
     end
 
-    subgraph monitoring["namespace: monitoring"]
-        GRAFANA["Grafana\n:3000"]
-        PROM["Prometheus\n:9090"]
-        AM["Alertmanager\n:9093"]
-        LOKI["Loki\n:3100"]
-        PROMTAIL["Promtail"]
-    end
-
-    subgraph argocd_ns["namespace: argocd"]
-        ARGO["ArgoCD\n:8080"]
+    subgraph monitoring["namespace: monitoring  [zone=monitoring]"]
+        GRAFANA["Grafana - svc:80 -> pod:3000"]
+        PROM["Prometheus - :9090"]
+        AM["Alertmanager - :9093"]
+        LOKI["Loki - :3100"]
+        PROMTAIL["Promtail (DaemonSet)"]
+        PROM_DB[("PVC prometheus-db")]
+        LOKI_PVC[("PVC loki - 5Gi")]
     end
 
     subgraph weave_ns["namespace: weave"]
-        SCOPE["Weave Scope\n:4040"]
+        SCOPE["weave-scope-app - :4040"]
+        AGENT["weave-scope-agent (DaemonSet)"]
+        CAGENT["weave-scope-cluster-agent"]
     end
 
     subgraph velero_ns["namespace: velero"]
-        VEL["Velero"]
-        MINIO[("Minio S3\n20Gi")]
+        VEL["Velero + Kopia"]
+        MINIO[("Minio S3 - 20Gi")]
+    end
+
+    subgraph dmz["namespace: dmz  [zone=dmz]  (vide)"]
     end
 
     %% Flux utilisateur → Ingress
@@ -84,33 +86,34 @@ graph TD
     INGRESS -->|"grafana.acme.test"| GRAFANA
     INGRESS -->|"prometheus.acme.test"| PROM
     INGRESS -->|"alertmanager.acme.test"| AM
-    INGRESS -->|"argocd.acme.test"| ARGO
     INGRESS -->|"scope.acme.test"| SCOPE
 
     %% Flux services internes
     FRONT -->|":8080"| BACK
-    BACK -->|"LDAP :389"| LDAP
     BACK --- H2
-    LDAP --- LDAP_D
-    CRON -->|"cp .mv.db"| BK_PVC
+    BACK --- UP
+    LDAP --- LD
+    LDAP --- LC
 
     %% Monitoring
     PROMTAIL -.->|"scrape logs"| FRONT
     PROMTAIL -.->|"scrape logs"| BACK
     PROMTAIL -->|"push"| LOKI
-    PROM -.->|"scrape metrics :8080"| BACK
-    PROM -.->|"scrape metrics"| INGRESS
+    PROM -.->|"scrape :8080"| BACK
     GRAFANA -->|"query"| PROM
     GRAFANA -->|"query"| LOKI
     PROM -->|"alertes"| AM
+    PROM --- PROM_DB
+    LOKI --- LOKI_PVC
 
-    %% Weave Scope observe tout
-    SCOPE -.->|"observe pods/connexions"| services
-    SCOPE -.->|"observe pods/connexions"| monitoring
+    %% Weave Scope
+    AGENT -.->|"observe"| services
+    AGENT -.->|"observe"| monitoring
+    CAGENT -.->|"cluster info"| SCOPE
 
-    %% Velero backup
-    VEL -->|"backup PVCs"| H2
-    VEL -->|"backup PVCs"| LDAP_D
+    %% Velero
+    VEL -->|"Kopia backup"| H2
+    VEL -->|"Kopia backup"| LD
     VEL -->|"store"| MINIO
 
     %% Styles
@@ -118,96 +121,108 @@ graph TD
     style ingress_ns fill:#fef3c7,stroke:#f59e0b
     style services fill:#dbeafe,stroke:#3b82f6
     style monitoring fill:#d1fae5,stroke:#10b981
-    style argocd_ns fill:#fce7f3,stroke:#ec4899
     style weave_ns fill:#e0f2fe,stroke:#0284c7
     style velero_ns fill:#ede9fe,stroke:#8b5cf6
+    style dmz fill:#f3f4f6,stroke:#9ca3af,stroke-dasharray:5 5
 ```
 
 ## Flux réseau & NetworkPolicies
 
 ```mermaid
 graph LR
-    subgraph INET["🌐 Externe"]
-        U([Client])
+    subgraph EXT["Externe"]
+        U(["Client"])
     end
 
-    subgraph NI["ingress-nginx"]
-        NG["nginx\n:443/:80"]
+    subgraph NI["ingress-nginx [kubernetes.io/metadata.name=ingress-nginx]"]
+        NG["nginx - LB :443/:80"]
     end
 
-    subgraph SVC["services ■ default-deny"]
-        FE["frontend\n:3000"]
-        BE["backend\n:8080"]
-        OP["openldap\n:389"]
+    subgraph DMZ["dmz [zone=dmz] — vide"]
     end
 
-    subgraph MON["monitoring ■ default-deny"]
-        GR["grafana\n:3000"]
-        PR["prometheus\n:9090"]
-        AL["alertmanager\n:9093"]
-        LK["loki"]
+    subgraph SVC["services ■ default-deny-all [Ingress+Egress]"]
+        FE["frontend - :3000"]
+        BE["backend - :8080"]
+        OP["openldap - :389"]
     end
 
-    subgraph ACD["argocd"]
-        AR["argocd-server\n:8080"]
+    subgraph MON["monitoring ■ default-deny-all [Ingress+Egress]"]
+        GR["grafana - :3000"]
+        PR["prometheus - :9090"]
+        AL["alertmanager - :9093"]
+        LK["loki - :3100"]
     end
 
     subgraph WV["weave"]
-        SC["scope\n:4040"]
+        SC["scope - :4040"]
     end
 
-    %% Autorisé
-    U -->|"✅ HTTPS"| NG
-    NG -->|"✅ :3000"| FE
-    NG -->|"✅ :8080"| BE
-    NG -->|"✅ :3000"| GR
-    NG -->|"✅ :9090"| PR
-    NG -->|"✅ :9093"| AL
-    NG -->|"✅ :8080"| AR
-    NG -->|"✅ :4040"| SC
-    FE -->|"✅ :8080"| BE
-    BE -->|"✅ :389"| OP
-    PR -.->|"✅ scrape"| BE
-    PR -.->|"✅ scrape"| NG
+    %% Flux autorisés
+    U -->|"HTTPS"| NG
 
-    %% Bloqué
-    U --->|"❌ direct"| FE
-    U --->|"❌ direct"| BE
-    U --->|"❌ direct"| OP
-    FE --->|"❌ :389"| OP
+    NG -->|":3000 allow-ingress-to-frontend"| FE
+    NG -->|":8080 allow-ingress-to-backend"| BE
+    NG -->|":3000 allow-ingress-to-grafana"| GR
+    NG -->|":9090 allow-ingress-to-prometheus"| PR
+    NG -->|":9093 allow-ingress-to-alertmanager"| AL
+    NG -->|":4040 allow-ingress-to-weave-scope"| SC
 
-    style INET fill:#fee2e2,stroke:#ef4444
+    FE -->|":8080 allow-frontend-to-backend"| BE
+    BE -->|":389 allow-backend-to-ldap"| OP
+
+    PR -.->|"scrape :8080 allow-monitoring-scrape"| BE
+    PR -.->|"internal"| GR
+    GR -.->|"internal"| LK
+
+    %% Flux bloqués
+    U --->|"direct denied"| FE
+    U --->|"direct denied"| BE
+    FE --->|"denied"| OP
+
+    style EXT fill:#fee2e2,stroke:#ef4444
     style NI fill:#fef3c7,stroke:#f59e0b
+    style DMZ fill:#f3f4f6,stroke:#9ca3af,stroke-dasharray:5 5
     style SVC fill:#dbeafe,stroke:#3b82f6
     style MON fill:#d1fae5,stroke:#10b981
-    style ACD fill:#fce7f3,stroke:#ec4899
     style WV fill:#e0f2fe,stroke:#0284c7
 ```
 
-## NetworkPolicies
+## NetworkPolicies (état cluster)
 
-| Règle | Source | Destination | Port | Namespace |
-|-------|--------|-------------|------|-----------|
-| allow-internet-to-ingress | 0.0.0.0/0 | ingress-nginx | 80, 443 | dmz |
-| allow-dmz-to-itadaki-frontend | ingress-nginx | itadaki-frontend | 3000 | services |
-| allow-dmz-to-itadaki-backend | ingress-nginx | itadaki-backend | 8080 | services |
-| allow-frontend-to-backend | itadaki-frontend | itadaki-backend | 8080 | services |
-| allow-backend-to-ldap | itadaki-backend | openldap | 389 | services |
-| allow-monitoring-scrape | monitoring | services + dmz | 8080, 9100 | services |
-| allow-ingress-to-grafana | ingress-nginx | grafana | 3000 | monitoring |
-| allow-ingress-to-prometheus | ingress-nginx | prometheus | 9090 | monitoring |
-| allow-ingress-to-alertmanager | ingress-nginx | alertmanager | 9093 | monitoring |
-| allow-ingress-to-argocd | ingress-nginx | argocd-server | 8080 | argocd |
-| allow-ingress-to-weave-scope | ingress-nginx | weave-scope-app | 4040 | weave |
-| default-deny-all | — | dmz, services, monitoring | tout bloqué | * |
+| Namespace | Règle | Type | Source | Destination | Port |
+|-----------|-------|------|--------|-------------|------|
+| dmz | allow-internet-to-ingress | Ingress | 0.0.0.0/0 | ingress-nginx pods | 80, 443 |
+| dmz | allow-monitoring-scrape-dmz | Ingress | zone=monitoring | (all) | 8080, 9090, 9100 |
+| dmz | default-deny-all | Ingress+Egress | — | — | — |
+| monitoring | allow-ingress-to-grafana | Ingress | ingress-nginx ns | grafana | 3000 |
+| monitoring | allow-ingress-to-prometheus | Ingress | ingress-nginx ns | prometheus | 9090 |
+| monitoring | allow-ingress-to-alertmanager | Ingress | ingress-nginx ns | alertmanager | 9093 |
+| monitoring | allow-monitoring-internal | Ingress+Egress | pods within ns | pods within ns | all |
+| monitoring | allow-monitoring-egress | Egress | (all) | zone=dmz, zone=services | 8080, 9090, 9100 |
+| monitoring | default-deny-all | Ingress+Egress | — | — | — |
+| services | allow-ingress-to-frontend | Ingress | ingress-nginx ns | itadaki-frontend | 3000 |
+| services | allow-ingress-to-backend | Ingress | ingress-nginx ns | itadaki-backend | 8080 |
+| services | allow-dmz-to-itadaki-frontend | Ingress | zone=dmz ns | itadaki-frontend | 3000 |
+| services | allow-dmz-to-itadaki-backend | Ingress | zone=dmz ns | itadaki-backend | 8080 |
+| services | allow-frontend-to-backend-egress | Egress | itadaki-frontend | itadaki-backend | 8080 |
+| services | allow-frontend-to-backend-ingress | Ingress | itadaki-frontend | itadaki-backend | 8080 |
+| services | allow-backend-to-ldap-egress | Egress | itadaki-backend | openldap | 389 |
+| services | allow-backend-to-ldap-ingress | Ingress | itadaki-backend | openldap | 389 |
+| services | allow-monitoring-scrape-services | Ingress | zone=monitoring | (all) | 8080, 9090, 9100 |
+| services | default-deny-all | Ingress+Egress | — | — | — |
+| weave | allow-ingress-to-weave-scope | Ingress | ingress-nginx ns | weave-scope-app | 4040 |
 
-## Persistance des données
+## Persistance des données (PVCs actifs)
 
-| Donnée | PVC | Taille | Survit à la suppression |
-|--------|-----|--------|------------------------|
-| H2 (Itadaki) | `itadaki-h2-pvc` | 2Gi | Oui |
-| LDAP data | `ldap-data-openldap-0` | 1Gi | Oui |
-| LDAP config | `ldap-config-openldap-0` | 100Mi | Oui |
-| Backup H2 | `backup-pvc` | 10Gi | Oui |
-| Loki logs | PVC Helm loki-stack | 5Gi | Oui |
-| Minio (Velero) | `minio-pvc` | 20Gi | Oui |
+| Donnée | PVC | Taille | Namespace |
+|--------|-----|--------|-----------|
+| H2 (Itadaki DB) | `itadaki-h2-pvc` | 2Gi | services |
+| Uploads (images) | `itadaki-uploads-pvc` | 5Gi | services |
+| LDAP data | `ldap-data-openldap-0` | 1Gi | services |
+| LDAP config | `ldap-config-openldap-0` | 100Mi | services |
+| Prometheus | `prometheus-db-prometheus-...` | auto | monitoring |
+| Loki logs | `storage-loki-stack-0` | 5Gi | monitoring |
+| Minio (Velero S3) | `minio-pvc` | 20Gi | velero |
+
+> Backup : Velero + Kopia sauvegarde automatiquement les namespaces `services` et `monitoring` vers Minio.
