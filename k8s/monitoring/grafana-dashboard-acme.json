@@ -1,0 +1,183 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "9.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" },
+    { "type": "datasource", "id": "loki", "name": "Loki", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "ACME Corp — Monitoring Wiki.js / LDAP / Postgres",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "mappings": [
+            { "options": { "0": { "color": "green", "text": "Running" }, "1": { "color": "red", "text": "Not Running" } }, "type": "value" }
+          ]
+        }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "footer": { "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "9.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "kube_pod_status_phase{namespace=~\"dmz|services\"}",
+          "legendFormat": "{{namespace}}/{{pod}} — {{phase}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Statut des pods — dmz & services",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 2,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "rate(nginx_ingress_controller_requests{ingress=\"wikijs\"}[1m])",
+          "legendFormat": "req/s",
+          "refId": "A"
+        }
+      ],
+      "title": "Requêtes/s vers Wiki.js",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 3,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "rate(nginx_ingress_controller_requests{status=~\"5..\",ingress=\"wikijs\"}[1m]) / rate(nginx_ingress_controller_requests{ingress=\"wikijs\"}[1m])",
+          "legendFormat": "5xx rate",
+          "refId": "A"
+        }
+      ],
+      "title": "Taux d'erreurs 5xx",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 16 },
+      "id": 4,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "{app=\"wikijs\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Logs Wiki.js (temps réel)",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 16 },
+      "id": 5,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "{job=\"nginx-ingress\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Logs Nginx Ingress",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 36,
+  "style": "dark",
+  "tags": ["acme", "wikijs", "k8s"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "name": "DS_PROMETHEUS",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "type": "datasource"
+      },
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "name": "DS_LOKI",
+        "options": [],
+        "query": "loki",
+        "refresh": 1,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "ACME Corp — Wiki.js Monitoring",
+  "uid": "acme-wikijs-001",
+  "version": 1
+}

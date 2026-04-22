@@ -1,0 +1,43 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-backend-egress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: itadaki-frontend
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: itadaki-backend
+      ports:
+        - protocol: TCP
+          port: 8080
+    # DNS
+    - ports:
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-backend-ingress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: itadaki-backend
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: itadaki-frontend
+      ports:
+        - protocol: TCP
+          port: 8080

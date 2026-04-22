@@ -1,0 +1,107 @@
+# Base DN
+dn: dc=acme,dc=local
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: ACME Corp
+dc: acme
+
+# OU Users
+dn: ou=users,dc=acme,dc=local
+objectClass: top
+objectClass: organizationalUnit
+ou: users
+
+# OU Groups
+dn: ou=groups,dc=acme,dc=local
+objectClass: top
+objectClass: organizationalUnit
+ou: groups
+
+# Groupe admins
+dn: cn=admins,ou=groups,dc=acme,dc=local
+objectClass: top
+objectClass: groupOfNames
+cn: admins
+member: uid=admin1,ou=users,dc=acme,dc=local
+
+# Groupe editors
+dn: cn=editors,ou=groups,dc=acme,dc=local
+objectClass: top
+objectClass: groupOfNames
+cn: editors
+member: uid=editor1,ou=users,dc=acme,dc=local
+member: uid=editor2,ou=users,dc=acme,dc=local
+
+# Groupe viewers
+dn: cn=viewers,ou=groups,dc=acme,dc=local
+objectClass: top
+objectClass: groupOfNames
+cn: viewers
+member: uid=viewer1,ou=users,dc=acme,dc=local
+member: uid=viewer2,ou=users,dc=acme,dc=local
+
+# User admin1 (admins) — mot de passe : Admin1234!
+dn: uid=admin1,ou=users,dc=acme,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: admin1
+cn: Admin One
+sn: One
+givenName: Admin
+mail: admin1@acme.local
+userPassword: {SSHA}bQlb+1WynxjCl4YXcWYbSyYBVUh0yPu2
+
+# User editor1 (editors) — mot de passe : Editor1234!
+dn: uid=editor1,ou=users,dc=acme,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: editor1
+cn: Editor One
+sn: One
+givenName: Editor
+mail: editor1@acme.local
+userPassword: {SSHA}RFEFen6cNvo88S07eOW8OAV3ishUUhOd
+
+# User editor2 (editors) — mot de passe : Editor1234!
+dn: uid=editor2,ou=users,dc=acme,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: editor2
+cn: Editor Two
+sn: Two
+givenName: Editor
+mail: editor2@acme.local
+userPassword: {SSHA}RFEFen6cNvo88S07eOW8OAV3ishUUhOd
+
+# User viewer1 (viewers) — mot de passe : Viewer1234!
+dn: uid=viewer1,ou=users,dc=acme,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: viewer1
+cn: Viewer One
+sn: One
+givenName: Viewer
+mail: viewer1@acme.local
+userPassword: {SSHA}laJbvAjygg4iPJbbXI6kbGmSc4ImC1vm
+
+# User viewer2 (viewers) — mot de passe : Viewer1234!
+dn: uid=viewer2,ou=users,dc=acme,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: viewer2
+cn: Viewer Two
+sn: Two
+givenName: Viewer
+mail: viewer2@acme.local
+userPassword: {SSHA}laJbvAjygg4iPJbbXI6kbGmSc4ImC1vm

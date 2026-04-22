@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: itadaki-backend
+  namespace: services
+spec:
+  type: ClusterIP
+  selector:
+    app: itadaki-backend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP

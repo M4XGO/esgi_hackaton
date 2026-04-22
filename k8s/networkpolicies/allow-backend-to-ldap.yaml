@@ -1,0 +1,43 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-ldap-egress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: itadaki-backend
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: openldap
+      ports:
+        - protocol: TCP
+          port: 389
+    # DNS
+    - ports:
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-ldap-ingress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: openldap
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: itadaki-backend
+      ports:
+        - protocol: TCP
+          port: 389
