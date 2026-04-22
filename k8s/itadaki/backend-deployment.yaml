@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: itadaki-backend
+  namespace: services
+  labels:
+    app: itadaki-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: itadaki-backend
+  template:
+    metadata:
+      labels:
+        app: itadaki-backend
+      annotations:
+        k8s.v1.cni.cncf.io/networks: nad-services
+    spec:
+      containers:
+        - name: backend
+          # Image buildée localement et poussée dans le registry K3s
+          # Pousser avec : docker tag itadaki-backend:latest localhost:5000/itadaki-backend:latest
+          #                docker push localhost:5000/itadaki-backend:latest
+          image: localhost:5000/itadaki-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:h2:file:/data/itadaki;AUTO_SERVER=TRUE
+            - name: SPRING_DATASOURCE_DRIVER_CLASS_NAME
+              value: org.h2.Driver
+            - name: SPRING_JPA_DATABASE_PLATFORM
+              value: org.hibernate.dialect.H2Dialect
+            - name: SPRING_H2_CONSOLE_ENABLED
+              value: "true"
+            - name: SPRING_H2_CONSOLE_SETTINGS_WEB_ALLOW_OTHERS
+              value: "true"
+            - name: LDAP_URL
+              value: ldap://openldap.services.svc.cluster.local:389
+            - name: LDAP_BASE_DN
+              value: dc=acme,dc=local
+            - name: LDAP_BIND_DN
+              value: cn=admin,dc=acme,dc=local
+            - name: LDAP_BIND_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ldap-secret
+                  key: LDAP_BIND_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+          volumeMounts:
+            - name: h2-data
+              mountPath: /data
+      volumes:
+        - name: h2-data
+          persistentVolumeClaim:
+            claimName: itadaki-h2-pvc

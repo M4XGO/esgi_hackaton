@@ -1,0 +1,73 @@
+loki:
+  enabled: true
+  # PVC explicite — si Loki est supprimé et redéployé, les logs restent sur disque
+  persistence:
+    enabled: true
+    storageClassName: local-path
+    size: 5Gi
+  config:
+    auth_enabled: false
+    ingester:
+      chunk_idle_period: 3m
+      chunk_block_size: 262144
+      chunk_retain_period: 1m
+      max_transfer_retries: 0
+    limits_config:
+      enforce_metric_name: false
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+
+promtail:
+  enabled: true
+  config:
+    scrape_configs:
+      - job_name: itadaki-backend
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [services]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: itadaki-backend
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - target_label: job
+            replacement: itadaki-backend
+
+      - job_name: itadaki-frontend
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [services]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: itadaki-frontend
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - target_label: job
+            replacement: itadaki-frontend
+
+      - job_name: nginx-ingress
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [ingress-nginx]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            regex: ingress-nginx
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - target_label: job
+            replacement: nginx-ingress
+
+# Grafana déjà installé via kube-prometheus-stack (terraform-kube)
+# On désactive le Grafana de loki-stack pour éviter les doublons
+grafana:
+  enabled: false

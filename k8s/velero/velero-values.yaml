@@ -1,0 +1,53 @@
+configuration:
+  # Provider AWS = compatible S3/Minio
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: velero
+      default: true
+      config:
+        region: minio
+        s3ForcePathStyle: "true"
+        s3Url: http://minio.velero.svc.cluster.local:9000
+        publicUrl: http://minio.velero.svc.cluster.local:9000
+
+  volumeSnapshotLocation:
+    - name: default
+      provider: aws
+      config:
+        region: minio
+
+  # Active le backup filesystem (kopia) pour TOUS les PVCs
+  # Compatible local-path (pas de CSI snapshots nécessaires)
+  defaultVolumesToFsBackup: true
+
+# Credentials Minio (même clé que le Secret minio-secret)
+credentials:
+  useSecret: true
+  existingSecret: velero-s3-credentials
+
+# Node-agent = DaemonSet qui monte les PVCs sur chaque nœud pour les copier
+nodeAgent:
+  enabled: true
+  podVolumePath: /var/lib/kubelet/pods
+  # Sur K3s les pods sont dans containerd, pas kubelet standard
+  # Adapter si les volumes ne sont pas trouvés :
+  # podVolumePath: /run/k3s/containerd/io.containerd.runtime.v2.task
+
+deployNodeAgent: true
+
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.10.0
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

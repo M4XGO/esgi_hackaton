@@ -1,0 +1,19 @@
+# Backup quotidien de TOUS les namespaces applicatifs
+# Inclut : objets K8s (Deployments, StatefulSets, Secrets, ConfigMaps...)
+#          + données PVCs (via kopia filesystem backup)
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-full-backup
+  namespace: velero
+spec:
+  schedule: "0 1 * * *"   # 1h du matin chaque jour
+  template:
+    includedNamespaces:
+      - services
+      - monitoring
+      - dmz
+    # Backup des volumes via filesystem (kopia) — requis pour local-path
+    defaultVolumesToFsBackup: true
+    ttl: 168h   # Rétention 7 jours
+    storageLocation: default

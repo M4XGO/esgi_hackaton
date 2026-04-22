@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: itadaki-frontend
+  namespace: services
+  labels:
+    app: itadaki-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: itadaki-frontend
+  template:
+    metadata:
+      labels:
+        app: itadaki-frontend
+      annotations:
+        k8s.v1.cni.cncf.io/networks: nad-services
+    spec:
+      containers:
+        - name: frontend
+          # Image buildée localement et poussée dans le registry K3s
+          # Pousser avec : docker tag itadaki-frontend:latest localhost:5000/itadaki-frontend:latest
+          #                docker push localhost:5000/itadaki-frontend:latest
+          image: localhost:5000/itadaki-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: http://itadaki-backend.services.svc.cluster.local:8080
+            - name: NODE_ENV
+              value: production
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 256Mi
+              cpu: 300m

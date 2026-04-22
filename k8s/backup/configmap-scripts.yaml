@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-scripts
+  namespace: services
+data:
+  backup.sh: |
+    #!/bin/sh
+    set -e
+    FILENAME="/backup/itadaki-h2-$(date +%Y%m%d-%H%M).mv.db"
+    echo "Backup H2 -> $FILENAME"
+    cp /data/itadaki.mv.db "$FILENAME"
+    echo "Done. Cleaning old backups (keep last 7)..."
+    ls -t /backup/*.mv.db | tail -n +8 | xargs -r rm --
+    echo "Backup complete: $FILENAME"
+
+  restore.sh: |
+    #!/bin/sh
+    set -e
+    LATEST=$(ls /backup/*.mv.db 2>/dev/null | sort | tail -1)
+    if [ -z "$LATEST" ]; then
+      echo "ERROR: no H2 backup found in /backup/" >&2
+      exit 1
+    fi
+    echo "Restoring from $LATEST..."
+    cp "$LATEST" /data/itadaki.mv.db
+    echo "Restore complete. Redémarrer le pod backend pour prendre en compte."

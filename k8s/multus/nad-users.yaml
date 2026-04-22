@@ -1,0 +1,27 @@
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: nad-users
+  namespace: dmz
+spec:
+  config: |
+    {
+      "cniVersion": "0.3.1",
+      "name": "nad-users",
+      "type": "macvlan",
+      "master": "eth0",
+      "mode": "bridge",
+      "ipam": {
+        "type": "host-local",
+        "ranges": [
+          [
+            {
+              "subnet": "10.0.3.0/24",
+              "rangeStart": "10.0.3.10",
+              "rangeEnd": "10.0.3.250",
+              "gateway": "10.0.3.1"
+            }
+          ]
+        ]
+      }
+    }

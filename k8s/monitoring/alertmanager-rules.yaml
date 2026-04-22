@@ -1,0 +1,35 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: acme-alerts
+  namespace: monitoring
+  labels:
+    app: kube-prometheus-stack
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: acme.rules
+      interval: 30s
+      rules:
+        - alert: AcmePodDown
+          expr: kube_pod_status_phase{namespace=~"dmz|services",phase!="Running"} > 0
+          for: 2m
+          labels:
+            severity: critical
+            team: acme
+          annotations:
+            summary: "Pod {{ $labels.pod }} dans {{ $labels.namespace }} n'est pas Running"
+            description: "Le pod {{ $labels.pod }} (namespace {{ $labels.namespace }}) est en phase {{ $labels.phase }} depuis plus de 2 minutes."
+
+        - alert: AcmeHighErrorRate
+          expr: |
+            rate(nginx_ingress_controller_requests{status=~"5.."}[1m])
+            /
+            rate(nginx_ingress_controller_requests[1m]) > 0.05
+          for: 1m
+          labels:
+            severity: warning
+            team: acme
+          annotations:
+            summary: "Taux d'erreurs 5xx élevé sur l'ingress"
+            description: "Plus de 5% des requêtes retournent une erreur 5xx depuis 1 minute."
