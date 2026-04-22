@@ -1,6 +1,5 @@
 SHELL := /bin/bash
-.PHONY: all namespaces secrets multus-install multus ldap app monitoring backup velero netpol hubble restore test-netpol
-.PHONY: all namespaces secrets multus-install multus ldap monitoring backup velero netpol hubble restore test-netpol
+.PHONY: all namespaces secrets multus-install multus ldap app monitoring backup velero netpol restore test-netpol scope scope-ui
 
 all: namespaces secrets multus ldap monitoring backup
 
@@ -46,14 +45,22 @@ backup:
 netpol:
 	kubectl apply -f k8s/networkpolicies/
 
-hubble:
-	cilium hubble enable --ui
 
 restore:
 	kubectl create job restore-now --from=cronjob/h2-backup -n services
 
 test-netpol:
 	bash scripts/test-netpol.sh
+
+# ── Weave Scope — visualisation des flux réseau ───────────────────────────────
+scope:
+	kubectl apply -f https://github.com/weaveworks/scope/releases/download/v1.13.2/k8s-scope.yaml
+	kubectl rollout status deployment/weave-scope-app -n weave --timeout=120s
+
+# Ouvre l'UI sur http://localhost:4040
+scope-ui:
+	@echo "Weave Scope UI → http://localhost:4040"
+	kubectl port-forward -n weave svc/weave-scope-app 4040:80
 
 # ── Velero + Minio ────────────────────────────────────────────────────────────
 # Prérequis : make secrets (génère minio-secret + velero-s3-credentials)

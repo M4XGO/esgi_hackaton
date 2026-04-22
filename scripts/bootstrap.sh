@@ -15,8 +15,8 @@ make multus
 echo "[4/7] LDAP..."
 make ldap
 
-echo "[5/7] Postgres + Wiki.js..."
-make app
+echo "[5/7] App Itadaki (décommenter make app dans Makefile quand images buildées)..."
+# make app
 
 echo "[6/7] Monitoring (Loki + alertes)..."
 make monitoring
@@ -33,5 +33,5 @@ echo ""
 echo "Quand tout est Ready, appliquer les NetworkPolicies :"
 echo "  make netpol"
 echo ""
-echo "Puis activer Hubble pour les preuves jury :"
-echo "  make hubble"
+echo "Pour tester les NetworkPolicies :"
+echo "  make test-netpol"

@@ -19,13 +19,54 @@ spec:
         k8s.v1.cni.cncf.io/networks: nad-services
     spec:
       initContainers:
-        # Copie le LDIF depuis le ConfigMap (read-only) vers un emptyDir (writable)
-        # monté sur /ldif-custom (chemin libre, pas un répertoire osixia)
-        # → osixia lit via LDAP_SEED_INTERNAL_LDIF_PATH=/ldif-custom
-        # → osixia rm son propre répertoire par défaut (pas un mount point)
-        - name: copy-ldif
-          image: busybox:1.36
-          command: ["/bin/sh", "-c", "cp /ldif-source/bootstrap.ldif /ldif-custom/bootstrap.ldif"]
+        # Lit le LDIF template (placeholders __*_PW__) depuis le ConfigMap,
+        # calcule les hashes SSHA depuis les secrets K8s,
+        # écrit le LDIF final dans /ldif-custom (emptyDir writable).
+        - name: gen-ldif
+          image: python:3.12-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              python3 << 'PYEOF'
+              import hashlib, os, base64
+
+              def ssha(password):
+                  salt = os.urandom(4)
+                  h = hashlib.sha1(password.encode('utf-8') + salt).digest()
+                  return '{SSHA}' + base64.b64encode(h + salt).decode()
+
+              admin1_pw  = ssha(os.environ['ADMIN1_PASSWORD'])
+              editor_pw  = ssha(os.environ['EDITOR_PASSWORD'])
+              viewer_pw  = ssha(os.environ['VIEWER_PASSWORD'])
+
+              with open('/ldif-source/bootstrap.ldif') as f:
+                  content = f.read()
+
+              content = content.replace('__ADMIN1_PW__', admin1_pw)
+              content = content.replace('__EDITOR_PW__', editor_pw)
+              content = content.replace('__VIEWER_PW__', viewer_pw)
+
+              with open('/ldif-custom/bootstrap.ldif', 'w') as f:
+                  f.write(content)
+
+              print("LDIF generated successfully.")
+              PYEOF
+          env:
+            - name: ADMIN1_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ldap-users-secret
+                  key: ADMIN1_PASSWORD
+            - name: EDITOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ldap-users-secret
+                  key: EDITOR_PASSWORD
+            - name: VIEWER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ldap-users-secret
+                  key: VIEWER_PASSWORD
           volumeMounts:
             - name: bootstrap-source
               mountPath: /ldif-source
