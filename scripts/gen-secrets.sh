@@ -13,6 +13,13 @@ kubectl create secret generic ldap-secret \
   --from-literal=LDAP_BIND_PASSWORD="$LDAP_BIND_PASSWORD" \
   -n services --dry-run=client -o yaml | kubectl apply -f -
 
+# Mots de passe des comptes utilisateurs LDAP (utilisés par l'initContainer pour générer les hashes SSHA)
+kubectl create secret generic ldap-users-secret \
+  --from-literal=ADMIN1_PASSWORD="$LDAP_ADMIN1_PASSWORD" \
+  --from-literal=EDITOR_PASSWORD="$LDAP_EDITOR_PASSWORD" \
+  --from-literal=VIEWER_PASSWORD="$LDAP_VIEWER_PASSWORD" \
+  -n services --dry-run=client -o yaml | kubectl apply -f -
+
 # ConfigMap LDAP bootstrap — généré depuis le fichier source (single source of truth)
 kubectl create configmap ldap-bootstrap \
   --from-file=bootstrap.ldif=k8s/ldap/bootstrap.ldif \
