@@ -50,6 +50,13 @@ monitoring:
 	kubectl apply -f k8s/monitoring/loki-datasource.yaml
 	kubectl apply -f k8s/monitoring/alertmanager-rules.yaml
 
+grafana-ldap:
+	helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+		--reuse-values \
+		-f k8s/monitoring/grafana-ldap-values.yaml \
+		-n monitoring
+	kubectl rollout status deployment/kube-prometheus-stack-grafana -n monitoring --timeout=120s
+
 backup:
 	kubectl apply -f k8s/backup/pvc-backup.yaml
 	kubectl apply -f k8s/backup/configmap-scripts.yaml

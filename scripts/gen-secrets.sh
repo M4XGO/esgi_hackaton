@@ -39,6 +39,11 @@ aws_access_key_id=${MINIO_ROOT_USER}
 aws_secret_access_key=${MINIO_ROOT_PASSWORD}" \
   -n velero --dry-run=client -o yaml | kubectl apply -f -
 
+# Secret LDAP bind pour Grafana (namespace monitoring)
+kubectl create secret generic grafana-ldap-bind \
+  --from-literal=LDAP_BIND_PASSWORD="$LDAP_BIND_PASSWORD" \
+  -n monitoring --dry-run=client -o yaml | kubectl apply -f -
+
 # JWT secret pour le backend Itadaki
 kubectl create secret generic itadaki-secret \
   --from-literal=JWT_SECRET="$JWT_SECRET" \

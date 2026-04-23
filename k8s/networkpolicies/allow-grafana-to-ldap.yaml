@@ -1,0 +1,51 @@
+# Egress : Grafana (monitoring) → OpenLDAP (services) :389
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-to-ldap-egress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: services
+          podSelector:
+            matchLabels:
+              app: openldap
+      ports:
+        - protocol: TCP
+          port: 389
+    # DNS
+    - ports:
+        - protocol: UDP
+          port: 53
+---
+# Ingress : OpenLDAP (services) ← Grafana (monitoring)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-to-ldap-ingress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: openldap
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+      ports:
+        - protocol: TCP
+          port: 389

@@ -1,0 +1,51 @@
+# Helm values overlay pour activer LDAP sur Grafana
+# Usage : helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#           --reuse-values -f k8s/monitoring/grafana-ldap-values.yaml -n monitoring
+prometheus:
+  verticalPodAutoscaler:
+    enabled: false
+alertmanager:
+  verticalPodAutoscaler:
+    enabled: false
+grafana:
+  envFromSecret: "grafana-ldap-bind"
+  grafana.ini:
+    auth.ldap:
+      enabled: true
+      allow_sign_up: true
+      config_file: /etc/grafana/ldap.toml
+  ldap:
+    enabled: true
+    config: |-
+      [[servers]]
+      host = "openldap.services.svc.cluster.local"
+      port = 389
+      use_ssl = false
+      start_tls = false
+      bind_dn = "cn=admin,dc=acme,dc=local"
+      bind_password = "$__env{LDAP_BIND_PASSWORD}"
+      search_filter = "(uid=%s)"
+      search_base_dns = ["ou=users,dc=acme,dc=local"]
+
+      [servers.attributes]
+      name = "cn"
+      surname = "sn"
+      username = "uid"
+      email = "mail"
+
+      # Recherche de groupes (groupOfNames avec attribut member)
+      group_search_filter = "(member=%s)"
+      group_search_base_dns = ["ou=groups,dc=acme,dc=local"]
+      group_search_filter_user_attribute = "dn"
+
+      [[servers.group_mappings]]
+      group_dn = "cn=admins,ou=groups,dc=acme,dc=local"
+      org_role = "Admin"
+
+      [[servers.group_mappings]]
+      group_dn = "cn=editors,ou=groups,dc=acme,dc=local"
+      org_role = "Editor"
+
+      [[servers.group_mappings]]
+      group_dn = "cn=viewers,ou=groups,dc=acme,dc=local"
+      org_role = "Viewer"
